@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Scarface vs Tomato Can — Locked Play</title>
+  <style>
+    :root{--bg:#0b1220;--card:#0f172a;--muted:#94a3b8;--text:#e2e8f0;--ring:#22d3ee}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:#0b1220;color:var(--text)}
+    .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
+    .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .title{font-weight:700}
+    .subtitle{color:var(--muted);font-size:.9rem}
+
+    .grid{display:grid;grid-template-columns:2fr 1.1fr;gap:14px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+
+    .card{background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+    .card .hd{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px}
+    .card .bd{padding:12px}
+
+    /* 16:9 responsive player */
+    .video-wrap{position:relative}
+    .video-wrap iframe{width:100%;aspect-ratio:16/9;height:auto;border:0;border-radius:10px}
+    .video-wrap.disabled iframe{pointer-events:none;filter:grayscale(.5) brightness(.85)}
+    .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35);border-radius:10px;font-weight:600}
+    .overlay .msg{padding:8px 12px;border-radius:12px;background:rgba(34,211,238,.15);border:1px solid rgba(34,211,238,.35)}
+
+    .row{display:grid;grid-template-columns:1.3fr 1fr .9fr auto;gap:8px}
+    input,select,button{border-radius:10px;border:1px solid rgba(255,255,255,.08);background:#0b1327;color:var(--text);padding:10px}
+    input::placeholder{color:#64748b}
+    button{cursor:pointer}
+    button.primary{background:#0b1730;border-color:#1f2b4a}
+    button.primary[disabled]{opacity:.5;cursor:not-allowed}
+    button.ghost{background:transparent;border-color:rgba(255,255,255,.08)}
+
+    .list{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width:700px){.list{grid-template-columns:1fr}}
+    .option{padding:10px;border-radius:12px;background:#0b1327;border:1px dashed rgba(255,255,255,.08)}
+    .option h3{margin:0 0 6px 0;font-size:1rem}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:20px;background:rgba(34,211,238,.12);color:#a5f3fc;font-size:.8rem}
+    ul{list-style:none;margin:8px 0 0 0;padding:0}
+    li{padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.06)}
+
+    .winner{outline:2px solid rgba(34,197,94,.35)}
+    .loser{opacity:.75}
+
+    .footer{margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    .result{padding:10px 12px;border-radius:10px;background:#0b1327;border:1px solid rgba(255,255,255,.08)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div>
+        <div class="title">Scarface vs Tomato Can</div>
+        <div class="subtitle">Place all bets, then lock to play. Amount accepts text.</div>
+      </div>
+      <div class="right-actions">
+        <button id="reset" class="ghost">Clear</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- Left: Video -->
+      <section class="card">
+        <div class="hd">Featured Video</div>
+        <div class="bd">
+          <div id="videoWrap" class="video-wrap disabled">
+            <div id="gate" class="overlay"><div class="msg">Lock bets to play</div></div>
+            <iframe id="yt" src="https://www.youtube.com/embed/RX8FRCWu1eY?rel=0&modestbranding=1&playsinline=1" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+          </div>
+          <div class="subtitle" style="margin-top:6px">Video ID: RX8FRCWu1eY</div>
+        </div>
+      </section>
+
+      <!-- Right: Controls -->
+      <section class="card">
+        <div class="hd">Add bettor</div>
+        <div class="bd">
+          <div class="row">
+            <input id="name" type="text" placeholder="Name">
+            <input id="amount" type="text" placeholder="Amount (text or number)">
+            <select id="pick"><option value="A">A — Scarface</option><option value="B">B — Tomato Can</option></select>
+            <button id="add" class="primary">Add</button>
+          </div>
+          <div class="footer">
+            <button id="lock" class="primary" disabled>Lock bets & Play</button>
+            <span class="subtitle">Need at least two bettors to lock.</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Bets overview -->
+    <section class="card" style="margin-top:14px">
+      <div class="hd">Bets</div>
+      <div class="bd">
+        <div class="list">
+          <div id="cardA" class="option">
+            <h3>Option A — Scarface <span class="pill"><span id="countA">0</span> bettors</span></h3>
+            <ul id="betsA"></ul>
+          </div>
+          <div id="cardB" class="option">
+            <h3>Option B — Tomato Can <span class="pill"><span id="countB">0</span> bettors</span></h3>
+            <ul id="betsB"></ul>
+          </div>
+        </div>
+        <div class="footer">
+          <button id="resolve" class="primary" disabled>Resolve (Random)</button>
+          <select id="manualSelect" disabled><option value="A">A wins (Scarface)</option><option value="B">B wins (Tomato Can)</option></select>
+          <button id="resolveManual" class="ghost" disabled>Resolve (Pick winner)</button>
+          <div id="result" class="result" style="display:none"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const state = { A: [], B: [], locked: false };
+
+    const els = {
+      name: document.getElementById('name'),
+      amount: document.getElementById('amount'),
+      pick: document.getElementById('pick'),
+      add: document.getElementById('add'),
+      lock: document.getElementById('lock'),
+      betsA: document.getElementById('betsA'),
+      betsB: document.getElementById('betsB'),
+      countA: document.getElementById('countA'),
+      countB: document.getElementById('countB'),
+      resolve: document.getElementById('resolve'),
+      resolveManual: document.getElementById('resolveManual'),
+      manualSelect: document.getElementById('manualSelect'),
+      result: document.getElementById('result'),
+      reset: document.getElementById('reset'),
+      cardA: document.getElementById('cardA'),
+      cardB: document.getElementById('cardB'),
+      videoWrap: document.getElementById('videoWrap'),
+      yt: document.getElementById('yt'),
+      gate: document.getElementById('gate')
+    };
+
+    function escapeHtml(str){return String(str).replace(/[&<>"']/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s]))}
+
+    function render(){
+      const rmv = (side,i)=> state.locked ? '' : ` <button class="ghost" data-side="${side}" data-i="${i}">remove</button>`;
+      els.betsA.innerHTML = state.A.map((b,i)=>`<li><strong>${escapeHtml(b.name)}</strong> — ${escapeHtml(b.amount)}${rmv('A',i)}</li>`).join('') || '<li style="opacity:.7">No bets</li>';
+      els.betsB.innerHTML = state.B.map((b,i)=>`<li><strong>${escapeHtml(b.name)}</strong> — ${escapeHtml(b.amount)}${rmv('B',i)}</li>`).join('') || '<li style="opacity:.7">No bets</li>';
+      els.countA.textContent = state.A.length;
+      els.countB.textContent = state.B.length;
+
+      // enable/disable controls
+      const total = state.A.length + state.B.length;
+      els.lock.disabled = !(total >= 2 && !state.locked);
+      [els.resolve, els.resolveManual, els.manualSelect].forEach(el=> el.disabled = !state.locked);
+
+      // wire remove buttons only if unlocked
+      if(!state.locked){
+        document.querySelectorAll('button[data-side]').forEach(btn=>{
+          btn.addEventListener('click',()=>{
+            const side = btn.getAttribute('data-side');
+            const i = Number(btn.getAttribute('data-i'));
+            state[side].splice(i,1); render();
+          });
+        });
+      }
+    }
+
+    function addBettor(){
+      if(state.locked) return;
+      const name = els.name.value.trim();
+      const amount = els.amount.value.trim();
+      const pick = els.pick.value;
+      if(!name || !amount){ return; }
+      state[pick].push({name, amount});
+      els.name.value = '';
+      els.amount.value = '';
+      render();
+    }
+
+    function lockAndPlay(){
+      const total = state.A.length + state.B.length;
+      if(total < 2 || state.locked) return;
+      state.locked = true;
+      // freeze inputs
+      [els.name, els.amount, els.pick, els.add, els.reset].forEach(el=> el.disabled = true);
+      // unlock video + autoplay muted for policy compliance
+      els.videoWrap.classList.remove('disabled');
+      els.gate.style.display = 'none';
+      const url = new URL(els.yt.src);
+      url.searchParams.set('autoplay','1');
+      url.searchParams.set('mute','1');
+      url.searchParams.set('playsinline','1');
+      els.yt.src = url.toString();
+      render();
+    }
+
+    els.add.addEventListener('click', addBettor);
+    [els.name, els.amount].forEach(el=> el.addEventListener('keydown', e=>{ if(e.key==='Enter'){ addBettor(); }}));
+    els.lock.addEventListener('click', lockAndPlay);
+
+    els.reset.addEventListener('click', ()=>{
+      if(state.locked) return; // cannot reset after lock
+      state.A = []; state.B = []; render(); els.result.style.display='none';
+    });
+
+    function finalize(winner){
+      const winners = winner==='A' ? state.A : state.B;
+      els.result.style.display = 'block';
+      els.result.innerHTML = `<strong>Winner: ${winner==='A'?'A — Scarface':'B — Tomato Can'}</strong>` + (winners.length? '<ul>'+ winners.map(w=>`<li><strong>'+escapeHtml(w.name)+'</strong> bet '+escapeHtml(w.amount)+'</li>`).join('') + '</ul>' : '<div class="subtitle">No winning bets.</div>');
+      els.cardA.classList.toggle('winner', winner==='A');
+      els.cardB.classList.toggle('winner', winner==='B');
+      els.cardA.classList.toggle('loser', winner==='B');
+      els.cardB.classList.toggle('loser', winner==='A');
+    }
+
+    els.resolve.addEventListener('click', ()=>{
+      if(!state.locked) return;
+      const winner = Math.random() < 0.5 ? 'A':'B';
+      finalize(winner);
+    });
+
+    els.resolveManual.addEventListener('click', ()=>{
+      if(!state.locked) return;
+      finalize(els.manualSelect.value);
+    });
+
+    render();
+  </script>
+</body>
+</html>
